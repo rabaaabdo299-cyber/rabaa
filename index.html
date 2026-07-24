@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لعبة تحدي الذاكرة - مراحل</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #70a1ff, #1e90ff);
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        h1 {
+            margin-bottom: 5px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+      .info-bar {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+      .info-box {
+            background: rgba(255,255,255,0.2);
+            padding: 8px 12px;
+            border-radius: 8px;
+        }
+
+      .grid {
+            display: grid;
+            grid-gap: 8px;
+            background-color: rgba(255, 255, 255, 0.2);
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+        }
+
+      .card {
+            width: 70px;
+            height: 70px;
+            background-color: #ffffff;
+            color: #1e90ff;
+            font-size: 1.8rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            cursor: pointer;
+            user-select: none;
+            transform: scale(1);
+            transition: transform 0.2s, background-color 0.2s;
+        }
+
+      .card:active { transform: scale(0.95); }
+      .card.flipped { background-color: #ffeaa7; color: #2d3436; }
+      .card.matched { background-color: #55efc4; color: #fff; visibility: hidden; }
+      .card.preview { background-color: #ffeaa7; color: #2d3436; }
+
+        #reset-btn {
+            margin-top: 15px;
+            padding: 10px 20px;
+            font-size: 1rem;
+            background-color: #ff7675;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        #message {
+            margin-top: 15px;
+            font-size: 1.4rem;
+            font-weight: bold;
+            height: 40px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🧠 لعبة تحدي الذاكرة - مراحل</h1>
+
+    <div class="info-bar">
+        <div class="info-box">🏆 المرحلة: <span id="level">1</span></div>
+        <div class="info-box">⏱️ الزمن: <span id="timer">40</span></div>
+        <div class="info-box">🎯 المحاولات: <span id="attempts">20</span></div>
+    </div>
+
+    <p id="status">احفظي اماكن الكروت...</p>
+    <div class="grid" id="game-grid"></div>
+
+    <div id="message"></div>
+    <button id="reset-btn" onclick="startGame()">إعادة اللعب 🔄</button>
+
+    <script>
+        // زدت المحاولات في كل المراحل
+        const levels = [
+            { // المرحلة 1: ساهلة 4x4
+                name: "المبتدئ",
+                cols: 4,
+                time: 40,
+                attempts: 20, // كانت 15
+                emojis: ['🍎','🍌','🍇','🍓','🥑','🥕','🍉','🥝']
+            },
+            { // المرحلة 2: متوسطة 4x5
+                name: "المحترف",
+                cols: 4,
+                time: 50,
+                attempts: 25, // كانت 18
+                emojis: ['🐶','🐱','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐸']
+            },
+            { // المرحلة 3: صعبة 5x4
+                name: "الخبير",
+                cols: 5,
+                time: 60,
+                attempts: 30, // كانت 20
+                emojis: ['🚗','✈️','🚢','🚲','🚀','🚁','🚜','🏍️','🚌','🚤']
+            },
+            { // المرحلة النهائية Boss: 6x4
+                name: "النهائية 🔥",
+                cols: 6,
+                time: 70,
+                attempts: 35, // كانت 25
+                emojis: ['💎','👑','⚔️','🛡️','🏰','🗡️','📜','🔮','⚡','💰','🌟','🎯']
+            }
+        ];
+
+        let currentLevel = 0;
+        let gameGrid = [];
+        let firstCard = null;
+        let secondCard = null;
+        let lockBoard = true;
+        let matchedPairs = 0;
+        let attempts = 0;
+        let timeLeft = 0;
+        let timerInterval = null;
+        let gameStarted = false;
+
+        const timerSpan = document.getElementById('timer');
+        const attemptsSpan = document.getElementById('attempts');
+        const levelSpan = document.getElementById('level');
+        const statusText = document.getElementById('status');
+        const messageDiv = document.getElementById('message');
+        const gridContainer = document.getElementById('game-grid');
+
+        function startGame() {
+            currentLevel = 0;
+            startLevel();
+        }
+
+        function startLevel() {
+            clearInterval(timerInterval);
+            gridContainer.innerHTML = '';
+
+            const levelData = levels[currentLevel];
+            const fullEmojis = [...levelData.emojis,...levelData.emojis];
+            gameGrid = fullEmojis.sort(() => 0.5 - Math.random());
+
+            firstCard = null;
+            secondCard = null;
+            lockBoard = true;
+            matchedPairs = 0;
+            attempts = levelData.attempts;
+            timeLeft = levelData.time;
+            gameStarted = false;
+
+            gridContainer.style.gridTemplateColumns = `repeat(${levelData.cols}, 70px)`;
+
+            timerSpan.textContent = timeLeft;
+            attemptsSpan.textContent = attempts;
+            levelSpan.textContent = `${currentLevel + 1} - ${levelData.name}`;
+            messageDiv.textContent = '';
+            statusText.textContent = `المرحلة ${currentLevel + 1}: ${levelData.name} - احفظي الكروت`;
+
+            gameGrid.forEach((emoji, index) => {
+                const card = document.createElement('div');
+                card.classList.add('card', 'preview');
+                card.dataset.emoji = emoji;
+                card.dataset.id = index;
+                card.textContent = emoji;
+                card.addEventListener('click', flipCard);
+                gridContainer.appendChild(card);
+            });
+
+            // كشف 3 ثواني
+            setTimeout(() => {
+                document.querySelectorAll('.card').forEach(card => {
+                    card.classList.remove('preview');
+                    card.textContent = '❓';
+                });
+                lockBoard = false;
+                gameStarted = true;
+                statusText.textContent = `يلا ابدئي! ${attempts} محاولات و ${timeLeft} ثانية`;
+                startTimer();
+            }, 3000);
+        }
+
+        function startTimer() {
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                timerSpan.textContent = timeLeft;
+                if(timeLeft <= 0) {
+                    endLevel(false);
+                }
+            }, 1000);
+        }
+
+        function flipCard() {
+            if (lockBoard || this.classList.contains('flipped') || this.classList.contains('matched')) return;
+            if (!gameStarted) return;
+
+            this.classList.add('flipped');
+            this.textContent = this.dataset.emoji;
+
+            if (!firstCard) {
+                firstCard = this;
+                return;
+            }
+
+            secondCard = this;
+            attempts--;
+            attemptsSpan.textContent = attempts;
+
+            if(attempts <= 0 && matchedPairs < levels[currentLevel].emojis.length) {
+                endLevel(false);
+                return;
+            }
+
+            checkForMatch();
+        }
+
+        function checkForMatch() {
+            lockBoard = true;
+            let isMatch = firstCard.dataset.emoji === secondCard.dataset.emoji;
+            isMatch? disableCards() : unflipCards();
+        }
+
+        function disableCards() {
+            setTimeout(() => {
+                firstCard.classList.add('matched');
+                secondCard.classList.add('matched');
+                matchedPairs++;
+                resetBoard();
+
+                if(matchedPairs === levels[currentLevel].emojis.length) {
+                    endLevel(true);
+                }
+            }, 500);
+        }
+
+        function unflipCards() {
+            setTimeout(() => {
+                firstCard.classList.remove('flipped');
+                firstCard.textContent = '❓';
+                secondCard.classList.remove('flipped');
+                secondCard.textContent = '❓';
+                resetBoard();
+            }, 1000);
+        }
+
+        function resetBoard() {
+            [firstCard, secondCard] = [null, null];
+            lockBoard = false;
+        }
+
+        function endLevel(won) {
+            clearInterval(timerInterval);
+            lockBoard = true;
+
+            if(won) {
+                if(currentLevel < levels.length - 1) {
+                    messageDiv.textContent = `🎉 مبروك! انتقلتي للمرحلة ${currentLevel + 2}`;
+                    messageDiv.style.color = '#55efc4';
+                    statusText.textContent = 'استعدي للمرحلة الجاية...';
+                    setTimeout(() => {
+                        currentLevel++;
+                        startLevel();
+                    }, 2000);
+                } else {
+                    messageDiv.textContent = '👑 فزتي باللعبة كلها! انتي أسطورة الذاكرة 👑';
+                    messageDiv.style.color = '#FFD700';
+                    statusText.textContent = 'اضغطي إعادة اللعب';
+                }
+            } else {
+                messageDiv.textContent = '😢 خسرتي! حاولي تاني';
+                messageDiv.style.color = '#ff7675';
+                statusText.textContent = 'اضغطي إعادة اللعب';
+            }
+        }
+
+        startGame();
+    </script>
+</body>
+</html>
